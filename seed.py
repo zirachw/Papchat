@@ -1,6 +1,9 @@
 import mysql.connector
+import copy
 from faker import Faker
 import random
+
+DATA_QUANTITY = 60
 
 # Create Faker instance
 faker = Faker()
@@ -31,7 +34,7 @@ for level in levels:
     """, (level['id'], level['name'], level['incentive'], level['min']))
 
 # Insert in User table
-for _ in range(50):
+for _ in range(DATA_QUANTITY):
     user_id = generate_unique_value("User", "user_id")
     email = faker.unique.safe_email()
     password = faker.password()
@@ -50,25 +53,30 @@ for _ in range(50):
 
 # Fetch user_ids from the User table
 cursor.execute("SELECT user_id FROM User")
-existing_user_ids = [row[0] for row in cursor.fetchall()]
+valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
+valid_friend_ids = copy.deepcopy(valid_user_ids)
 
 # Ensure that user_id and friend_id exist in the existing_user_ids list
-for _ in range(50):
-    user_id = random.choice(existing_user_ids)
-    friend_id = random.choice(existing_user_ids)
-    
+for _ in range(DATA_QUANTITY):
+    user_id = random.choice(valid_user_ids)
+    valid_user_ids.remove(user_id)
+    friend_id = random.choice(valid_friend_ids)
+    valid_friend_ids.remove(friend_id)
     # Avoid self-friendship (user can't be friends with themselves)
     if user_id != friend_id:
         cursor.execute("INSERT INTO Friend (user_id, friend_id) VALUES (%s, %s)", (user_id, friend_id))
         print(f"Inserted friendship: {user_id} -> {friend_id}")
 
+####################################### Subscription ####################################3333
+
 # Get all valid user_ids from User table
 cursor.execute("SELECT user_id FROM User")
-valid_user_ids = [row[0] for row in cursor.fetchall()]
+valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
 
 # Insert in Subscription
-for _ in range(50):
+for _ in range(DATA_QUANTITY):
     user_id = random.choice(valid_user_ids)
+    valid_user_ids.remove(user_id)
     subscription_number = generate_unique_value("Subscription", "subscription_number")
     subscribe_date = faker.date_this_year().strftime('%Y-%m-%d')
     expire_date = faker.date_this_year().strftime('%Y-%m-%d')
@@ -79,8 +87,10 @@ for _ in range(50):
         VALUES (%s, %s, %s, %s, %s)
     """, (user_id, subscription_number, subscribe_date, expire_date, status))
 
+################################### ROOM CHAT #######################################
+
 # Insert in Room_Chat
-for _ in range(50):
+for _ in range(DATA_QUANTITY):
     room_id = generate_unique_value("Room_Chat", "room_id")
     created_date = faker.date_this_year().strftime('%Y-%m-%d')
 
@@ -88,24 +98,35 @@ for _ in range(50):
         INSERT INTO Room_Chat (room_id, created_date) VALUES (%s, %s)
     """, (room_id, created_date))
 
+############################ ROOM JOIN ##########################
+
 # Get all valid room_ids from room_chat table
 cursor.execute("SELECT room_id FROM Room_Chat")
-valid_room_ids = [row[0] for row in cursor.fetchall()]
+valid_room_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
+cursor.execute("SELECT user_id FROM User")
+valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
 
 # Insert in Room_Join
-for _ in range(50):
+for _ in range(DATA_QUANTITY):
     room_id = random.choice(valid_room_ids)
+    valid_room_ids.remove(room_id)
     user_id = random.choice(valid_user_ids)
+    valid_user_ids.remove(user_id)
     join_date = faker.date_this_year().strftime('%Y-%m-%d')
 
     cursor.execute("""
         INSERT INTO Room_Join (room_id, user_id, join_date) VALUES (%s, %s, %s)
     """, (room_id, user_id, join_date))
 
+#########################################3 LENS ########################################3
+cursor.execute("SELECT user_id FROM User")
+valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
+
 # Insert Lens
-for _ in range(50):
+for _ in range(DATA_QUANTITY):
     lens_id = generate_unique_value("Lens", "lens_id")
     user_id = random.choice(valid_user_ids)
+    valid_user_ids.remove(user_id)
     release_date = faker.date_this_year().strftime('%Y-%m-%d')
 
     cursor.execute("""
@@ -113,10 +134,96 @@ for _ in range(50):
         VALUES (%s, %s, %s)
     """, (lens_id, user_id, release_date))
 
+#################################### PAP, CONTENT, CHAT, ADD ON, IMAGE, CAPTION #############################
+
 # Get all valid lens_id from User table
 cursor.execute("SELECT lens_id FROM Lens")
-valid_lens_ids = [row[0] for row in cursor.fetchall()]
+valid_lens_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
+cursor.execute("SELECT user_id FROM User")
+valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
+cursor.execute("SELECT room_id FROM Room_Chat")
+valid_room_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
 
+# Insert Pap, Content, Chat, Add_On, Image, Caption
+for i in range(DATA_QUANTITY):
+    user_id = random.choice(valid_user_ids)
+    valid_user_ids.remove(user_id)
+    room_id = random.choice(valid_room_ids)
+    valid_room_ids.remove(room_id)
+    sent_order = i + 1
+    send_time = faker.date_this_year().strftime('%Y-%m-%d %H:%M:%S')
+
+    cursor.execute("""
+        INSERT INTO Content (user_id, room_id, sent_order, send_time, is_exists)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (user_id, room_id, sent_order, send_time, 1))
+
+    # divide the content into two section
+    if (random.randint(0, 1) == 1) : # create chat
+
+        # Insert Chat
+        message = faker.sentence()
+        cursor.execute("""
+            INSERT INTO Chat (user_id, room_id, sent_order, message)
+            VALUES (%s, %s, %s, %s)
+        """, (user_id, room_id, sent_order, message))
+
+    else : # create pap
+
+        # Insert Pap
+        lens_id = random.choice(valid_lens_ids)
+        duration = random.randint(1, 60)
+        cursor.execute("""
+            INSERT INTO Pap (user_id, room_id, sent_order, lens_id, duration)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (user_id, room_id, sent_order, lens_id, duration))
+
+        if (random.randint(0, 1) == 1) : # if one, then add add-on
+            # Insert Add_On
+            addon_idx = 1
+            x_start = random.randint(0, 200)
+            x_end = x_start + random.randint(10, 100)
+            y_start = random.randint(0, 200)
+            y_end = y_start + random.randint(10, 100)
+            cursor.execute("""
+                INSERT INTO Add_On (user_id, room_id, sent_order, addon_idx, x_start, x_end, y_start, y_end)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (user_id, room_id, sent_order, addon_idx, x_start, x_end, y_start, y_end))
+
+            if (random.randint(0, 2) == 0) : # add image only
+
+                # Insert Image
+                cursor.execute("""
+                    INSERT INTO Image (user_id, room_id, sent_order, addon_idx, name)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (user_id, room_id, sent_order, addon_idx, f'image_{i}.jpg'))
+            elif (random.randint(1, 2) == 1) : # add caption only
+
+                # Insert Caption
+                font_style = random.choice(['Arial', 'Verdana', 'Comic Sans'])
+                text = faker.sentence()
+                cursor.execute("""
+                    INSERT INTO Caption (user_id, room_id, sent_order, addon_idx, font_style, text)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (user_id, room_id, sent_order, addon_idx, font_style, text))
+
+            else :  # add both
+
+                # Insert Image
+                cursor.execute("""
+                    INSERT INTO Image (user_id, room_id, sent_order, addon_idx, name)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (user_id, room_id, sent_order, addon_idx, f'image_{i}.jpg'))
+
+                # Insert Caption
+                font_style = random.choice(['Arial', 'Verdana', 'Comic Sans'])
+                text = faker.sentence()
+                cursor.execute("""
+                    INSERT INTO Caption (user_id, room_id, sent_order, addon_idx, font_style, text)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (user_id, room_id, sent_order, addon_idx, font_style, text))
+
+############################### LENS TYPE #################################3
 # Insert Lens_Type — one type per lens
 types = ['Face', 'Background', 'Both']
 
@@ -127,9 +234,15 @@ for lens_id in valid_lens_ids:
         VALUES (%s, %s)
     """, (lens_id, lens_type))
 
+
+################################## LOCATION #############################
+cursor.execute("SELECT user_id FROM User")
+valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
+
 # Insert Location
-for _ in range(50):
+for _ in range(DATA_QUANTITY):
     user_id = random.choice(valid_user_ids)
+    valid_user_ids.remove(user_id)
     start_time = faker.date_this_year().strftime('%Y-%m-%d %H:%M:%S')
     end_time = faker.date_this_year().strftime('%Y-%m-%d %H:%M:%S')
     latitude = faker.latitude()
@@ -140,57 +253,6 @@ for _ in range(50):
         VALUES (%s, %s, %s, %s, %s)
     """, (user_id, start_time, end_time, latitude, longitude))
 
-# Insert Pap, Content, Chat, Add_On, Image, Caption
-for i in range(1, 51):
-    user_id = random.choice(valid_user_ids)
-    room_id = random.choice(valid_room_ids)
-    sent_order = i
-    send_time = faker.date_this_year().strftime('%Y-%m-%d %H:%M:%S')
-
-    cursor.execute("""
-        INSERT INTO Content (user_id, room_id, sent_order, send_time, is_exists)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (user_id, room_id, sent_order, send_time, 1))
-
-    # Insert Pap
-    lens_id = random.randint(1, 50)
-    duration = random.randint(1, 60)
-    cursor.execute("""
-        INSERT INTO Pap (user_id, room_id, sent_order, lens_id, duration)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (user_id, room_id, sent_order, lens_id, duration))
-
-    # Insert Chat
-    message = faker.sentence()
-    cursor.execute("""
-        INSERT INTO Chat (user_id, room_id, sent_order, message)
-        VALUES (%s, %s, %s, %s)
-    """, (user_id, room_id, sent_order, message))
-
-    # Insert Add_On
-    addon_idx = 1
-    x_start = random.randint(0, 200)
-    x_end = x_start + random.randint(10, 100)
-    y_start = random.randint(0, 200)
-    y_end = y_start + random.randint(10, 100)
-    cursor.execute("""
-        INSERT INTO Add_On (user_id, room_id, sent_order, addon_idx, x_start, x_end, y_start, y_end)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """, (user_id, room_id, sent_order, addon_idx, x_start, x_end, y_start, y_end))
-
-    # Insert Image
-    cursor.execute("""
-        INSERT INTO Image (user_id, room_id, sent_order, addon_idx, name)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (user_id, room_id, sent_order, addon_idx, f'image_{i}.jpg'))
-
-    # Insert Caption
-    font_style = random.choice(['Arial', 'Verdana', 'Comic Sans'])
-    text = faker.sentence()
-    cursor.execute("""
-        INSERT INTO Caption (user_id, room_id, sent_order, addon_idx, font_style, text)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (user_id, room_id, sent_order, addon_idx, font_style, text))
 
 # Commit and close
 conn.commit()
