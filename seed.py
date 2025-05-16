@@ -8,7 +8,6 @@ MULTIPLIER_FOREIGN_DATA = 200
 
 # Create Faker instance
 faker = Faker()
-Faker.seed(69420)
 
 # Connect to MySQL without specifying the database first
 conn = mysql.connector.connect(host='localhost', user='root', password='rzi')   
@@ -38,10 +37,10 @@ CREATE TABLE IF NOT EXISTS Lens_Level (
 )
 """
 
-# User table
+# User table - Using AUTO_INCREMENT
 tables['User'] = """
 CREATE TABLE IF NOT EXISTS User (
-    user_id INT PRIMARY KEY,
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(100) UNIQUE NOT NULL,
     password VARCHAR(100) NOT NULL,
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -53,22 +52,24 @@ CREATE TABLE IF NOT EXISTS User (
 )
 """
 
-# Friend table
+# Friend table - Added streak and start_date
 tables['Friend'] = """
 CREATE TABLE IF NOT EXISTS Friend (
     user_id INT,
     friend_id INT,
+    start_date DATE NOT NULL,
+    streak INT DEFAULT 0,
     PRIMARY KEY (user_id, friend_id),
     FOREIGN KEY (user_id) REFERENCES User(user_id),
     FOREIGN KEY (friend_id) REFERENCES User(user_id)
 )
 """
 
-# Subscription table
+# Subscription table - Using AUTO_INCREMENT
 tables['Subscription'] = """
 CREATE TABLE IF NOT EXISTS Subscription (
+    subscription_number INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
-    subscription_number INT PRIMARY KEY,
     subscribe_date DATE NOT NULL,
     expire_date DATE NOT NULL,
     status TINYINT NOT NULL,
@@ -76,10 +77,10 @@ CREATE TABLE IF NOT EXISTS Subscription (
 )
 """
 
-# Room_Chat table
+# Room_Chat table - Using AUTO_INCREMENT
 tables['Room_Chat'] = """
 CREATE TABLE IF NOT EXISTS Room_Chat (
-    room_id INT PRIMARY KEY,
+    room_id INT AUTO_INCREMENT PRIMARY KEY,
     created_date DATE NOT NULL
 )
 """
@@ -96,10 +97,10 @@ CREATE TABLE IF NOT EXISTS Room_Join (
 )
 """
 
-# Lens table
+# Lens table - Using AUTO_INCREMENT
 tables['Lens'] = """
 CREATE TABLE IF NOT EXISTS Lens (
-    lens_id INT PRIMARY KEY,
+    lens_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     name VARCHAR(100) NOT NULL,
     release_date DATE NOT NULL,
@@ -133,17 +134,19 @@ CREATE TABLE IF NOT EXISTS Chat (
 )
 """
 
-# Pap table
+# Pap table - Modified to set duration=0 for photos
 tables['Pap'] = """
 CREATE TABLE IF NOT EXISTS Pap (
     user_id INT,
     room_id INT,
     sent_order INT,
     lens_id INT,
+    content_type ENUM('photo', 'video') NOT NULL,
     duration INT NOT NULL,
     PRIMARY KEY (user_id, room_id, sent_order),
     FOREIGN KEY (user_id, room_id, sent_order) REFERENCES Content(user_id, room_id, sent_order),
-    FOREIGN KEY (lens_id) REFERENCES Lens(lens_id)
+    FOREIGN KEY (lens_id) REFERENCES Lens(lens_id),
+    CHECK (content_type = 'photo' AND duration = 0 OR content_type = 'video' AND duration > 0)
 )
 """
 
@@ -190,17 +193,17 @@ CREATE TABLE IF NOT EXISTS Caption (
 )
 """
 
-# Lens_Type table
+# Lens_Type table - Modified to handle multiple types per lens
 tables['Lens_Type'] = """
 CREATE TABLE IF NOT EXISTS Lens_Type (
     lens_id INT,
-    type VARCHAR(50) NOT NULL,
-    PRIMARY KEY (lens_id),
+    type ENUM('Face', 'Background') NOT NULL,
+    PRIMARY KEY (lens_id, type),
     FOREIGN KEY (lens_id) REFERENCES Lens(lens_id)
 )
 """
 
-# Location table
+# Location table - Added status field (public/private)
 tables['Location'] = """
 CREATE TABLE IF NOT EXISTS Location (
     user_id INT,
@@ -208,6 +211,7 @@ CREATE TABLE IF NOT EXISTS Location (
     end_time DATETIME,
     latitude DECIMAL(9,6) NOT NULL,
     longitude DECIMAL(9,6) NOT NULL,
+    status ENUM('public', 'private') NOT NULL DEFAULT 'private',
     PRIMARY KEY (user_id, start_time),
     FOREIGN KEY (user_id) REFERENCES User(user_id)
 )
@@ -220,17 +224,6 @@ for table_name, create_statement in tables.items():
         print(f"Table '{table_name}' created or already exists")
     except mysql.connector.Error as err:
         print(f"Error creating table {table_name}: {err}")
-
-# Function to generate unique user id
-def generate_unique_value(table, column):    
-    cursor.execute(f"SELECT {column} FROM {table}")
-    exists = [row[0] for row in cursor.fetchall()]
-    while True and len(exists) < 10000:
-        new_value = random.randint(1, 10000)
-        print(exists)
-        if new_value not in exists:
-            return new_value
-    return -1    
 
 # Insert Lens_Level
 levels = [
@@ -257,21 +250,20 @@ else:
 cursor.execute("SELECT COUNT(*) FROM User")
 count = cursor.fetchone()[0]
 if count == 0:
-    # Insert in User table
+    # Insert in User table - Using AUTO_INCREMENT
     for _ in range(MIN_PRIM_DATA):
-        user_id = generate_unique_value("User", "user_id")
         email = faker.unique.safe_email()
         password = faker.password()
         username = faker.user_name()
-        telp_num = '08' + faker.numerify('#########')  # This will generate phone numbers like '08123456789'
+        telp_num = '08' + faker.numerify('#########')
         birthdate = faker.date_of_birth(minimum_age=18, maximum_age=70).strftime('%Y-%m-%d')
         date_created = faker.date_this_decade().strftime('%Y-%m-%d')
         level_id = None
 
         cursor.execute("""
-            INSERT INTO `User` (user_id, email, password, username, telp_num, birthdate, date_created, level_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (user_id, email, password, username, telp_num, birthdate, date_created, level_id))
+            INSERT INTO `User` (email, password, username, telp_num, birthdate, date_created, level_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (email, password, username, telp_num, birthdate, date_created, level_id))
 
         print(f"Inserted user: {username}")
 else:
@@ -300,8 +292,15 @@ if count == 0:
         if (user_id, friend_id) in inserted_pairs or (friend_id, user_id) in inserted_pairs:
             continue
 
-        cursor.execute("INSERT INTO Friend (user_id, friend_id) VALUES (%s, %s)", (user_id, friend_id))
-        cursor.execute("INSERT INTO Friend (user_id, friend_id) VALUES (%s, %s)", (friend_id, user_id))
+        # Start date and streak
+        start_date = faker.date_this_year().strftime('%Y-%m-%d')
+        streak = random.randint(0, 100)
+
+        cursor.execute("INSERT INTO Friend (user_id, friend_id, start_date, streak) VALUES (%s, %s, %s, %s)", 
+                      (user_id, friend_id, start_date, streak))
+        cursor.execute("INSERT INTO Friend (user_id, friend_id, start_date, streak) VALUES (%s, %s, %s, %s)", 
+                      (friend_id, user_id, start_date, streak))
+        
         inserted_pairs.add((user_id, friend_id))
         print(f"Inserted friendship: {user_id} <-> {friend_id}")
 else:
@@ -315,22 +314,29 @@ if count == 0:
     cursor.execute("SELECT user_id FROM User")
     valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
 
-    # Insert in Subscription
+    # Insert in Subscription - Using AUTO_INCREMENT
     MIN_DATA_SUBSCRIPTION = MIN_PRIM_DATA * 5
+    subscription_users = set()
     for _ in range(MIN_DATA_SUBSCRIPTION):
         if not valid_user_ids:
             break
         user_id = random.choice(valid_user_ids)
+        
+        # Ensure each user only has one subscription
+        if user_id in subscription_users:
+            continue
+            
+        subscription_users.add(user_id)
         valid_user_ids.remove(user_id)
-        subscription_number = generate_unique_value("Subscription", "subscription_number")
+        
         subscribe_date = faker.date_this_year().strftime('%Y-%m-%d')
         expire_date = faker.date_this_year().strftime('%Y-%m-%d')
         status = random.randint(0, 1)
 
         cursor.execute("""
-            INSERT INTO Subscription (user_id, subscription_number, subscribe_date, expire_date, status)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (user_id, subscription_number, subscribe_date, expire_date, status))
+            INSERT INTO Subscription (user_id, subscribe_date, expire_date, status)
+            VALUES (%s, %s, %s, %s)
+        """, (user_id, subscribe_date, expire_date, status))
     print("Inserted Subscription data")
 else:
     print("Subscription data already exists")
@@ -339,15 +345,14 @@ else:
 cursor.execute("SELECT COUNT(*) FROM Room_Chat")
 count = cursor.fetchone()[0]
 if count == 0:
-    # Insert in Room_Chat
+    # Insert in Room_Chat - Using AUTO_INCREMENT
     MIN_ROOM_DATA = MIN_PRIM_DATA
     for _ in range(MIN_ROOM_DATA):
-        room_id = generate_unique_value("Room_Chat", "room_id")
         created_date = faker.date_this_year().strftime('%Y-%m-%d')
 
         cursor.execute("""
-            INSERT INTO Room_Chat (room_id, created_date) VALUES (%s, %s)
-        """, (room_id, created_date))
+            INSERT INTO Room_Chat (created_date) VALUES (%s)
+        """, (created_date,))
     print("Inserted Room_Chat data")
 else:
     print("Room_Chat data already exists")
@@ -364,13 +369,30 @@ if count == 0:
 
     # Insert in Room_Join
     MIN_ROOM_JOIN = MULTIPLIER_FOREIGN_DATA * 2
-    for _ in range(MIN_ROOM_JOIN):
-        if not valid_user_ids or not valid_room_ids:
+    
+    # Ensure each room has at least one member (room can't be empty)
+    for room_id in valid_room_ids:
+        if not valid_user_ids:
+            break
+        user_id = random.choice(valid_user_ids)
+        join_date = faker.date_this_year().strftime('%Y-%m-%d')
+
+        cursor.execute("""
+            INSERT INTO Room_Join (room_id, user_id, join_date) VALUES (%s, %s, %s)
+        """, (room_id, user_id, join_date))
+        
+    # Add more room joins
+    for _ in range(MIN_ROOM_JOIN - len(valid_room_ids)):
+        if not valid_user_ids:
             break
         room_id = random.choice(valid_room_ids)
-        valid_room_ids.remove(room_id)
         user_id = random.choice(valid_user_ids)
-        valid_user_ids.remove(user_id)
+        
+        # Check if this room-user pair already exists
+        cursor.execute("SELECT COUNT(*) FROM Room_Join WHERE room_id = %s AND user_id = %s", (room_id, user_id))
+        if cursor.fetchone()[0] > 0:
+            continue
+            
         join_date = faker.date_this_year().strftime('%Y-%m-%d')
 
         cursor.execute("""
@@ -392,53 +414,48 @@ if count == 0:
     for _ in range(1):
         lens_name = faker.word() + "Lens"
         cursor.execute("""
-            INSERT INTO Lens (lens_id, user_id, name, release_date)
-            VALUES (%s, %s, %s, %s)
-        """, (generate_unique_value("Lens", "lens_id"), user_id, lens_name, faker.date_this_year().strftime('%Y-%m-%d')))
+            INSERT INTO Lens (user_id, name, release_date)
+            VALUES (%s, %s, %s)
+        """, (user_id, lens_name, faker.date_this_year().strftime('%Y-%m-%d')))
 
     # fill level id = 1 for a random user in Lens relation
     user_id = random.choice(valid_user_ids)
     for _ in range(13):
         lens_name = faker.word() + "Lens"
         cursor.execute("""
-            INSERT INTO Lens (lens_id, user_id, name, release_date)
-            VALUES (%s, %s, %s, %s)
-        """, (generate_unique_value("Lens", "lens_id"), user_id, lens_name, faker.date_this_year().strftime('%Y-%m-%d')))
+            INSERT INTO Lens (user_id, name, release_date)
+            VALUES (%s, %s, %s)
+        """, (user_id, lens_name, faker.date_this_year().strftime('%Y-%m-%d')))
 
     # fill level id = 2 for a random user in Lens relation
     user_id = random.choice(valid_user_ids)
     for _ in range(22):
         lens_name = faker.word() + "Lens"
         cursor.execute("""
-            INSERT INTO Lens (lens_id, user_id, name, release_date)
-            VALUES (%s, %s, %s, %s)
-        """, (generate_unique_value("Lens", "lens_id"), user_id, lens_name, faker.date_this_year().strftime('%Y-%m-%d')))
+            INSERT INTO Lens (user_id, name, release_date)
+            VALUES (%s, %s, %s)
+        """, (user_id, lens_name, faker.date_this_year().strftime('%Y-%m-%d')))
 
     # fill level id = 3 for a random user in Lens relation
     user_id = random.choice(valid_user_ids)
     for _ in range(31):
         lens_name = faker.word() + "Lens"
         cursor.execute("""
-            INSERT INTO Lens (lens_id, user_id, name, release_date)
-            VALUES (%s, %s, %s, %s)
-        """, (generate_unique_value("Lens", "lens_id"), user_id, lens_name, faker.date_this_year().strftime('%Y-%m-%d')))
+            INSERT INTO Lens (user_id, name, release_date)
+            VALUES (%s, %s, %s)
+        """, (user_id, lens_name, faker.date_this_year().strftime('%Y-%m-%d')))
 
     # Insert Lens
     MIN_LENS_DATA = MULTIPLIER_FOREIGN_DATA
     for _ in range(MIN_LENS_DATA):
-        lens_id = generate_unique_value("Lens", "lens_id")
         lens_name = faker.word() + "Lens"
         user_id = random.choice(valid_user_ids)
         release_date = faker.date_this_year().strftime('%Y-%m-%d')
 
-        if lens_id == -1:
-            continue
-        else:
-            cursor.execute("""
-                INSERT INTO Lens (lens_id, user_id, name, release_date)
-                VALUES (%s, %s, %s, %s)
-            """, (lens_id, user_id, lens_name, release_date))
-            # valid_user_ids.remove(user_id) if user_id in valid_user_ids else None
+        cursor.execute("""
+            INSERT INTO Lens (user_id, name, release_date)
+            VALUES (%s, %s, %s)
+        """, (user_id, lens_name, release_date))
 
     # Edit user based on how much lens each of them own
     cursor.execute("SELECT user_id, COUNT(lens_id) FROM Lens GROUP BY user_id")
@@ -472,10 +489,27 @@ if count == 0:
 
     # Insert Pap, Content, Chat, Add_On, Image, Caption
     MIN_CONTENT_DATA = MULTIPLIER_FOREIGN_DATA * 2
+    
+    # Create a dictionary to track sent_order for each user-room combination
+    sent_order_tracker = {}
+    
     for i in range(MIN_CONTENT_DATA):
         user_id = random.choice(valid_user_ids)
         room_id = random.choice(valid_room_ids)
-        sent_order = i + 1
+        
+        # Make sure the user is a member of the room
+        cursor.execute("SELECT COUNT(*) FROM Room_Join WHERE room_id = %s AND user_id = %s", (room_id, user_id))
+        if cursor.fetchone()[0] == 0:
+            # If user is not a member, add them to the room
+            join_date = faker.date_this_year().strftime('%Y-%m-%d')
+            cursor.execute("INSERT INTO Room_Join (room_id, user_id, join_date) VALUES (%s, %s, %s)", 
+                          (room_id, user_id, join_date))
+        
+        # Get the next sent_order for this user-room
+        key = f"{user_id}-{room_id}"
+        sent_order = sent_order_tracker.get(key, 0) + 1
+        sent_order_tracker[key] = sent_order
+        
         send_time = faker.date_time_this_year()
 
         cursor.execute("""
@@ -494,11 +528,13 @@ if count == 0:
         else:  # create pap
             # Insert Pap
             lens_id = random.choice(valid_lens_ids)
-            duration = random.randint(1, 60)
+            content_type = random.choice(['photo', 'video'])
+            # Set duration based on content_type (0 for photos, positive for videos)
+            duration = 0 if content_type == 'photo' else random.randint(1, 60)
             cursor.execute("""
-                INSERT INTO Pap (user_id, room_id, sent_order, lens_id, duration)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (user_id, room_id, sent_order, lens_id, duration))
+                INSERT INTO Pap (user_id, room_id, sent_order, lens_id, content_type, duration)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (user_id, room_id, sent_order, lens_id, content_type, duration))
         
             # Insert Add-On or not
             if (random.randint(0, 1) == 0):
@@ -557,15 +593,27 @@ if count == 0:
     cursor.execute("SELECT lens_id FROM Lens")
     valid_lens_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
     
-    # Insert Lens_Type — one type per lens
-    types = ['Face', 'Background', 'Both', 'Not Both']
-
+    # Insert Lens_Type — implementing "Both", "Not Both" logic
+    lens_types = ['Face', 'Background']
+    
     for lens_id in valid_lens_ids:
-        lens_type = random.choice(types)
-        cursor.execute("""
-            INSERT INTO Lens_Type (lens_id, type)
-            VALUES (%s, %s)
-        """, (lens_id, lens_type))
+        # Randomly decide if lens is 'Both', 'Face', 'Background', or 'Not Both'
+        lens_category = random.choice(['Both', 'Face', 'Background', 'Not Both'])
+        
+        if lens_category == 'Both':
+            # Insert both Face and Background types
+            for lens_type in lens_types:
+                cursor.execute("""
+                    INSERT INTO Lens_Type (lens_id, type)
+                    VALUES (%s, %s)
+                """, (lens_id, lens_type))
+        elif lens_category == 'Face' or lens_category == 'Background':
+            # Insert just one type
+            cursor.execute("""
+                INSERT INTO Lens_Type (lens_id, type)
+                VALUES (%s, %s)
+            """, (lens_id, lens_category))
+        # If 'Not Both', don't insert any type (lens has no type)
     print("Inserted Lens_Type data")
 else:
     print("Lens_Type data already exists")
@@ -587,6 +635,7 @@ if count == 0:
         end_time = start_time + faker.time_delta(end_datetime='+2h')
         latitude = round(random.uniform(-90.0, 90.0), 6)
         longitude = round(random.uniform(-180.0, 180.0), 6)
+        status = random.choice(['public', 'private'])
 
         # Fetch existing location entries for the user
         cursor.execute(f"SELECT start_time, end_time, latitude, longitude FROM Location WHERE user_id = {user_id}")
@@ -602,9 +651,10 @@ if count == 0:
 
         if not conflict:
             cursor.execute("""
-                INSERT INTO Location (user_id, start_time, end_time, latitude, longitude)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (user_id, start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), latitude, longitude))
+                INSERT INTO Location (user_id, start_time, end_time, latitude, longitude, status)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (user_id, start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), 
+                latitude, longitude, status))
     print("Inserted Location data")
 else:
     print("Location data already exists")
