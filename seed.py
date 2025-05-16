@@ -332,7 +332,7 @@ for _ in range(MIN_LOCATION_DATA):
     longitude = round(random.uniform(-180.0, 180.0), 6)
 
     # Fetch existing location entries for the user
-    cursor.execute(f"SELECT start_time, end_time, latitude, longitude FROM U WHERE user_id = {user_id}")
+    cursor.execute(f"SELECT start_time, end_time, latitude, longitude FROM Location WHERE user_id = {user_id}")
     existing_locations = cursor.fetchall()
 
     # Check for overlap
