@@ -14,12 +14,15 @@ conn = mysql.connector.connect(host='localhost', user='root', password='', datab
 cursor = conn.cursor()
 
 # Function to generate unique user id
-def generate_unique_value(table_name, col_name):
-    while True:
-        val = random.randint(1, 75)
-        cursor.execute(f"SELECT 1 FROM {table_name} WHERE {col_name} = {val}")
-        if cursor.fetchone() is None:
-            return val
+def generate_unique_value(table, column):    
+    cursor.execute(f"SELECT {column} FROM {table}")
+    exists = [row[0] for row in cursor.fetchall()]
+    while True and len(exists) < 75:
+        new_value = random.randint(1, 75)
+        print(exists)
+        if new_value not in exists:
+            return new_value
+    return -1    
 
 # Insert Lens_Level
 levels = [
@@ -55,20 +58,26 @@ for _ in range(MIN_PRIM_DATA):
 # Fetch user_ids from the User table
 cursor.execute("SELECT user_id FROM User")
 valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
-valid_friend_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
 
 # Ensure that user_id and friend_id exist in the existing_user_ids list
 MIN_DATA_FRIEND = MIN_PRIM_DATA * 2
+inserted_pairs = set()
+
 for _ in range(MIN_DATA_FRIEND):
     user_id = random.choice(valid_user_ids)
-    valid_user_ids.remove(user_id)
+    valid_friend_ids = [uid for uid in valid_user_ids if uid != user_id]
+    if not valid_friend_ids:
+        break
     friend_id = random.choice(valid_friend_ids)
-    # Avoid self-friendship (user can't be friends with themselves)
-    while friend_id == user_id :
-        friend_id = random.choice(valid_friend_ids)
-    valid_friend_ids.remove(friend_id)
+
+    # Skip if this pair (in either direction) is already inserted
+    if (user_id, friend_id) in inserted_pairs or (friend_id, user_id) in inserted_pairs:
+        continue
+
     cursor.execute("INSERT INTO Friend (user_id, friend_id) VALUES (%s, %s)", (user_id, friend_id))
-    print(f"Inserted friendship: {user_id} -> {friend_id}")
+    cursor.execute("INSERT INTO Friend (user_id, friend_id) VALUES (%s, %s)", (friend_id, user_id))
+    inserted_pairs.add((user_id, friend_id))
+    print(f"Inserted friendship: {user_id} <-> {friend_id}")
 
 ####################################### Subscription ####################################3333
 
@@ -79,6 +88,8 @@ valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
 # Insert in Subscription
 MIN_DATA_SUBSCRIPTION = MIN_PRIM_DATA * 5
 for _ in range(MIN_DATA_SUBSCRIPTION):
+    if not valid_user_ids :
+        break
     user_id = random.choice(valid_user_ids)
     valid_user_ids.remove(user_id)
     subscription_number = generate_unique_value("Subscription", "subscription_number")
@@ -114,6 +125,8 @@ valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
 # Insert in Room_Join
 MIN_ROOM_JOIN = MULTIPLIER_FOREIGN_DATA * 2
 for _ in range(MIN_ROOM_JOIN):
+    if not valid_user_ids :
+        break
     room_id = random.choice(valid_room_ids)
     valid_room_ids.remove(room_id)
     user_id = random.choice(valid_user_ids)
@@ -172,28 +185,29 @@ for _ in range(MIN_LENS_DATA):
     lens_id = generate_unique_value("Lens", "lens_id")
     lens_name = faker.word() + "Lens"
     user_id = random.choice(valid_user_ids)
-    valid_user_ids.remove(user_id)
     release_date = faker.date_this_year().strftime('%Y-%m-%d')
 
-    cursor.execute("""
-        INSERT INTO Lens (lens_id, user_id, name, release_date)
-        VALUES (%s, %s, %s, %s)
-    """, (lens_id, user_id, lens_name, release_date))
+    if lens_id == -1 :
+        continue
+    else :
+        cursor.execute("""
+            INSERT INTO Lens (lens_id, user_id, name, release_date)
+            VALUES (%s, %s, %s, %s)
+        """, (lens_id, user_id, lens_name, release_date))
+        valid_user_ids.remove(user_id)
 
 # Edit user based on how much lens each of them own
 cursor.execute("SELECT user_id, COUNT(lens_id) FROM Lens GROUP BY user_id")
 results = cursor.fetchall()
-lens_counts = copy.deepcopy([row[0] for row in results])
-user_ids = copy.deepcopy([row[1] for row in results])
 for user_id, lens_count in results:
     if 0 <= lens_count < 10:
-        cursor.execute("UPDATE User SET level_id = 0 WHERE User.user_id = %s", (user_ids[i], ))
+        cursor.execute("UPDATE User SET level_id = 0 WHERE User.user_id = %s", (user_id, ))
     elif 10 <= lens_count < 20 :
-        cursor.execute("UPDATE User SET level_id = 1 WHERE User.user_id = %s", (user_ids[i], ))
+        cursor.execute("UPDATE User SET level_id = 1 WHERE User.user_id = %s", (user_id, ))
     elif 20 <= lens_count < 30 :
-        cursor.execute("UPDATE User SET level_id = 2 WHERE User.user_id = %s", (user_ids[i], ))
+        cursor.execute("UPDATE User SET level_id = 2 WHERE User.user_id = %s", (user_id, ))
     elif 30 <= lens_count :
-        cursor.execute("UPDATE User SET level_id = 3 WHERE User.user_id = %s", (user_ids[i], ))
+        cursor.execute("UPDATE User SET level_id = 3 WHERE User.user_id = %s", (user_id, ))
 
 
 #################################### PAP, CONTENT, CHAT, ADD ON, IMAGE, CAPTION #############################
@@ -210,9 +224,7 @@ valid_room_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
 MIN_CONTENT_DATA = MULTIPLIER_FOREIGN_DATA * 2
 for i in range(MIN_CONTENT_DATA):
     user_id = random.choice(valid_user_ids)
-    valid_user_ids.remove(user_id)
     room_id = random.choice(valid_room_ids)
-    valid_room_ids.remove(room_id)
     sent_order = i + 1
     send_time = faker.date_this_year().strftime('%Y-%m-%d %H:%M:%S')
 
@@ -230,6 +242,8 @@ for i in range(MIN_CONTENT_DATA):
             INSERT INTO Chat (user_id, room_id, sent_order, message)
             VALUES (%s, %s, %s, %s)
         """, (user_id, room_id, sent_order, message))
+        # valid_user_ids.remove(user_id)
+        # valid_room_ids.remove(room_id)
 
     else : # create pap
 
@@ -240,7 +254,10 @@ for i in range(MIN_CONTENT_DATA):
             INSERT INTO Pap (user_id, room_id, sent_order, lens_id, duration)
             VALUES (%s, %s, %s, %s, %s)
         """, (user_id, room_id, sent_order, lens_id, duration))
+        # valid_user_ids.remove(user_id)
+        # valid_room_ids.remove(room_id)
     
+        # Insert Add-On or not
         if (random.randint(0, 1) == 0):
             continue
         else : # if one, then add add-on
@@ -303,45 +320,34 @@ for lens_id in valid_lens_ids:
 cursor.execute("SELECT user_id FROM User")
 valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
 
-# function for checking the pair
-def EntryLocationCheckPair(currentUsedStartTime, currentUsedEndTime, currentUsedLatitude, currentUsedLongitude, start_time, end_time, latitude, longitude) :
-    for curLat in currentUsedLatitude :
-        if curLat == latitude :
-            for curLong in currentUsedLongitude : 
-                if curLong == longitude :
-                    for i in range(len(currentUsedStartTime), 2):
-                        if currentUsedStartTime[i] < start_time < currentUsedEndTime[i] or current_start_times[i] < end_time < current_end_times[i] :
-                            return False
-    return True
-
 # Insert Location
-for _ in range(MIN_PRIM_DATA):
+MIN_LOCATION_DATA = MIN_PRIM_DATA
+for _ in range(MIN_LOCATION_DATA):
     user_id = random.choice(valid_user_ids)
-
-    # get each start time and end time, get start time and user id, and then compare each start time and user id
-    cursor.execute("SELECT start_time, end_time, latitude, longitude FROM Location WHERE user_id = %s", (user_id,))
-    rows = cursor.fetchall()
-    current_start_times = copy.deepcopy([row[0] for row in rows])
-    current_end_times = copy.deepcopy([row[1] for row in rows])
-    current_latitudes = copy.deepcopy([row[2] for row in rows])
-    current_longitudes = copy.deepcopy([row[3] for row in rows])
     
-    loop = random.randint(0, 3)
-    i = 0
-    while i < loop :
-        start_time = faker.date_this_year().strftime('%Y-%m-%d %H:%M:%S')
-        end_time = faker.date_this_year().strftime('%Y-%m-%d %H:%M:%S')
-        latitude = faker.latitude()
-        longitude = faker.longitude()
+    # Generate new entry time and location
+    start_time = faker.date_time_this_year()
+    end_time = start_time + faker.time_delta(end_datetime='+2h')
+    latitude = round(random.uniform(-90.0, 90.0), 6)
+    longitude = round(random.uniform(-180.0, 180.0), 6)
 
-        # check start time, end time, latitude and longitude
-        if EntryLocationCheckPair(current_start_times, current_end_times, current_latitudes, current_longitudes, start_time, end_time, latitude, longitude) :
-            cursor.execute("""
-                INSERT INTO Location (user_id, start_time, end_time, latitude, longitude)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (user_id, start_time, end_time, latitude, longitude))
-            valid_user_ids.remove(user_id)
-            i += 1
+    # Fetch existing location entries for the user
+    cursor.execute(f"SELECT start_time, end_time, latitude, longitude FROM U WHERE user_id = {user_id}")
+    existing_locations = cursor.fetchall()
+
+    # Check for overlap
+    conflict = False
+    for s_time, e_time, lat, lon in existing_locations:
+        if lat == latitude and lon == longitude:
+            if (s_time <= start_time <= e_time) or (s_time <= end_time <= e_time):
+                conflict = True
+                break
+
+    if not conflict:
+        cursor.execute("""
+            INSERT INTO Location (user_id, start_time, end_time, latitude, longitude)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (user_id, start_time.strftime('%Y-%m-%d %H:%M:%S'), end_time.strftime('%Y-%m-%d %H:%M:%S'), latitude, longitude))
 
 # Commit and close
 conn.commit()
