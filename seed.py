@@ -2,6 +2,7 @@ import mysql.connector
 import copy
 from faker import Faker
 import random
+import datetime
 
 MIN_PRIM_DATA = 150
 MULTIPLIER_FOREIGN_DATA = 200
@@ -313,49 +314,89 @@ if count == 0:
     # Get all valid user_ids from User table
     cursor.execute("SELECT user_id FROM User")
     valid_user_ids = copy.deepcopy([row[0] for row in cursor.fetchall()])
-
+    
+    # Track subscription periods per user to avoid overlaps
+    user_subscriptions = {}  # user_id -> list of (subscribe_date, expire_date) tuples
+    
     # Insert in Subscription - Using AUTO_INCREMENT
     MIN_DATA_SUBSCRIPTION = MIN_PRIM_DATA * 5
-    subscription_users = set()
-    for _ in range(MIN_DATA_SUBSCRIPTION):
-        if not valid_user_ids:
-            break
+    subscriptions_added = 0
+    attempts = 0
+    max_attempts = MIN_DATA_SUBSCRIPTION * 2  # Allow for some failed attempts
+    
+    # Get current date as date object
+    current_date = datetime.date.today()
+    
+    while subscriptions_added < MIN_DATA_SUBSCRIPTION and attempts < max_attempts:
+        attempts += 1
+        
+        # Allow multiple subscriptions per user
         user_id = random.choice(valid_user_ids)
         
-        # Ensure each user only has one subscription
-        if user_id in subscription_users:
-            continue
-            
-        subscription_users.add(user_id)
-        valid_user_ids.remove(user_id)
+        # Generate realistic subscription dates
+        subscribe_date_obj = faker.date_this_year()  # This returns a date object
+        subscribe_date = subscribe_date_obj.strftime('%Y-%m-%d')
         
-        subscribe_date = faker.date_this_year().strftime('%Y-%m-%d')
-        expire_date = faker.date_this_year().strftime('%Y-%m-%d')
-        status = random.randint(0, 1)
-
+        # Make expire_date after subscribe_date (1-12 months later)
+        months_to_add = random.randint(1, 12)
+        
+        # Calculate expire date properly
+        year_to_add = (subscribe_date_obj.month + months_to_add - 1) // 12
+        new_month = ((subscribe_date_obj.month + months_to_add - 1) % 12) + 1
+        
+        try:
+            expire_date_obj = datetime.date(
+                year=subscribe_date_obj.year + year_to_add,
+                month=new_month,
+                day=subscribe_date_obj.day
+            )
+        except ValueError:
+            # Handle edge case for months with different days
+            if new_month == 2:  # February
+                last_day = 29 if (subscribe_date_obj.year + year_to_add) % 4 == 0 else 28
+            elif new_month in [4, 6, 9, 11]:  # April, June, September, November
+                last_day = 30
+            else:
+                last_day = 31
+                
+            expire_date_obj = datetime.date(
+                year=subscribe_date_obj.year + year_to_add,
+                month=new_month,
+                day=min(subscribe_date_obj.day, last_day)
+            )
+            
+        expire_date = expire_date_obj.strftime('%Y-%m-%d')
+        
+        # Check for overlap with existing subscriptions for this user
+        has_overlap = False
+        if user_id in user_subscriptions:
+            for sub_start, sub_end in user_subscriptions[user_id]:
+                # Check if dates overlap
+                if (subscribe_date_obj <= sub_end and expire_date_obj >= sub_start):
+                    has_overlap = True
+                    break
+        
+        if has_overlap:
+            continue  # Skip this subscription and try again
+            
+        # Status: 1 for active, 0 for expired
+        status = 1 if expire_date_obj >= current_date else 0
+        
+        # Add to our tracking dictionary
+        if user_id not in user_subscriptions:
+            user_subscriptions[user_id] = []
+        user_subscriptions[user_id].append((subscribe_date_obj, expire_date_obj))
+        
         cursor.execute("""
             INSERT INTO Subscription (user_id, subscribe_date, expire_date, status)
             VALUES (%s, %s, %s, %s)
         """, (user_id, subscribe_date, expire_date, status))
-    print("Inserted Subscription data")
+        
+        subscriptions_added += 1
+    
+    print(f"Inserted {subscriptions_added} Subscription records")
 else:
     print("Subscription data already exists")
-
-# Check if Room_Chat table is empty before inserting
-cursor.execute("SELECT COUNT(*) FROM Room_Chat")
-count = cursor.fetchone()[0]
-if count == 0:
-    # Insert in Room_Chat - Using AUTO_INCREMENT
-    MIN_ROOM_DATA = MIN_PRIM_DATA
-    for _ in range(MIN_ROOM_DATA):
-        created_date = faker.date_this_year().strftime('%Y-%m-%d')
-
-        cursor.execute("""
-            INSERT INTO Room_Chat (created_date) VALUES (%s)
-        """, (created_date,))
-    print("Inserted Room_Chat data")
-else:
-    print("Room_Chat data already exists")
 
 # Check if Room_Join table is empty before inserting
 cursor.execute("SELECT COUNT(*) FROM Room_Join")
