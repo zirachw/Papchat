@@ -226,7 +226,7 @@ for i in range(MIN_CONTENT_DATA):
     user_id = random.choice(valid_user_ids)
     room_id = random.choice(valid_room_ids)
     sent_order = i + 1
-    send_time = faker.date_this_year().strftime('%Y-%m-%d %H:%M:%S')
+    send_time = faker.date_time_this_year()
 
     cursor.execute("""
         INSERT INTO Content (user_id, room_id, sent_order, send_time, is_exists)
