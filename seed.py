@@ -10,7 +10,7 @@ MULTIPLIER_FOREIGN_DATA = 200
 faker = Faker()
 
 # Connect to MySQL without specifying the database first
-conn = mysql.connector.connect(host='localhost', user='root', password='rzi')   
+conn = mysql.connector.connect(host='localhost', user='root', password='')   
 cursor = conn.cursor()
 
 # Create database if it doesn't exist
