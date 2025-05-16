@@ -32,7 +32,7 @@ tables['Lens_Level'] = """
 CREATE TABLE IF NOT EXISTS Lens_Level (
     level_id INT PRIMARY KEY,
     level_name VARCHAR(50) NOT NULL,
-    incentive DECIMAL(10, 2) NOT NULL,
+    incentive INT NOT NULL,
     n_min_lens_created INT NOT NULL
 )
 """
