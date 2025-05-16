@@ -3,11 +3,12 @@ import copy
 from faker import Faker
 import random
 
-MIN_PRIM_DATA = 100
-MULTIPLIER_FOREIGN_DATA = 150
+MIN_PRIM_DATA = 150
+MULTIPLIER_FOREIGN_DATA = 200
 
 # Create Faker instance
 faker = Faker()
+Faker.seed(69420)
 
 # Connect to MySQL without specifying the database first
 conn = mysql.connector.connect(host='localhost', user='root', password='rzi')   
