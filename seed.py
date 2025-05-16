@@ -3,8 +3,8 @@ import copy
 from faker import Faker
 import random
 
-MIN_PRIM_DATA = 30
-MULTIPLIER_FOREIGN_DATA = 50
+MIN_PRIM_DATA = 100
+MULTIPLIER_FOREIGN_DATA = 150
 
 # Create Faker instance
 faker = Faker()
@@ -224,8 +224,8 @@ for table_name, create_statement in tables.items():
 def generate_unique_value(table, column):    
     cursor.execute(f"SELECT {column} FROM {table}")
     exists = [row[0] for row in cursor.fetchall()]
-    while True and len(exists) < 75:
-        new_value = random.randint(1, 75)
+    while True and len(exists) < 10000:
+        new_value = random.randint(1, 10000)
         print(exists)
         if new_value not in exists:
             return new_value
@@ -265,7 +265,7 @@ if count == 0:
         telp_num = '08' + faker.numerify('#########')  # This will generate phone numbers like '08123456789'
         birthdate = faker.date_of_birth(minimum_age=18, maximum_age=70).strftime('%Y-%m-%d')
         date_created = faker.date_this_decade().strftime('%Y-%m-%d')
-        level_id = 0
+        level_id = None
 
         cursor.execute("""
             INSERT INTO `User` (user_id, email, password, username, telp_num, birthdate, date_created, level_id)
@@ -437,13 +437,15 @@ if count == 0:
                 INSERT INTO Lens (lens_id, user_id, name, release_date)
                 VALUES (%s, %s, %s, %s)
             """, (lens_id, user_id, lens_name, release_date))
-            valid_user_ids.remove(user_id) if user_id in valid_user_ids else None
+            # valid_user_ids.remove(user_id) if user_id in valid_user_ids else None
 
     # Edit user based on how much lens each of them own
     cursor.execute("SELECT user_id, COUNT(lens_id) FROM Lens GROUP BY user_id")
     results = cursor.fetchall()
     for user_id, lens_count in results:
-        if 0 <= lens_count < 10:
+        if lens_count == 0:
+            cursor.execute("UPDATE User SET level_id = null WHERE User.user_id = %s", (user_id, ))
+        elif 1 <= lens_count < 10:
             cursor.execute("UPDATE User SET level_id = 0 WHERE User.user_id = %s", (user_id, ))
         elif 10 <= lens_count < 20:
             cursor.execute("UPDATE User SET level_id = 1 WHERE User.user_id = %s", (user_id, ))
