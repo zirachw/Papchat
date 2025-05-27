@@ -69,11 +69,12 @@ CREATE TABLE IF NOT EXISTS Friend (
 # Subscription table - Using AUTO_INCREMENT
 tables['Subscription'] = """
 CREATE TABLE IF NOT EXISTS Subscription (
-    subscription_number INT AUTO_INCREMENT PRIMARY KEY,
+    subscription_number INT AUTO_INCREMENT,
     user_id INT,
     subscribe_date DATE NOT NULL,
     expire_date DATE NOT NULL,
     status TINYINT NOT NULL,
+    PRIMARY KEY (subscription_number, user_id),
     FOREIGN KEY (user_id) REFERENCES User(user_id)
 )
 """
