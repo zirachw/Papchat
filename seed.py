@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS Subscription (
     user_id INT,
     subscribe_date DATE NOT NULL,
     expire_date DATE NOT NULL,
-    status TINYINT NOT NULL,
+    status ENUM('inactive', 'active') NOT NULL,
     PRIMARY KEY (subscription_number, user_id),
     FOREIGN KEY (user_id) REFERENCES User(user_id)
 )
