@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS Content (
     user_id INT,
     room_id INT,
     sent_order INT,
-    send_time DATETIME NOT NULL,
+    send_time DATETIME,
     is_exists TINYINT NOT NULL,
     PRIMARY KEY (user_id, room_id, sent_order),
     FOREIGN KEY (user_id) REFERENCES User(user_id),
