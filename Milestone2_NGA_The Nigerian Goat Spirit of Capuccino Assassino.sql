@@ -4255,12 +4255,12 @@ CREATE TABLE `pap` (
   `sent_order` int(11) NOT NULL CHECK (`sent_order` > 0),
   `lens_id` int(11) DEFAULT NULL CHECK (`lens_id` > 0),
   `duration` int(11) NOT NULL CHECK (`duration` >= 0),
-  `content_type` enum('photo','video') NOT NULL,
+  `type` enum('photo','video') NOT NULL,
   PRIMARY KEY (`user_id`,`room_id`,`sent_order`),
   KEY `RA_PAP_LENS` (`lens_id`),
   CONSTRAINT `RA_PAP_CONTENT` FOREIGN KEY (`user_id`, `room_id`, `sent_order`) REFERENCES `content` (`user_id`, `room_id`, `sent_order`) ON DELETE CASCADE,
   CONSTRAINT `RA_PAP_LENS` FOREIGN KEY (`lens_id`) REFERENCES `lens` (`lens_id`),
-  CONSTRAINT `RC_PAP_TYPE_DURATION` CHECK (`content_type` = 'photo' and `duration` = 0 or `content_type` = 'video' and `duration` > 0)
+  CONSTRAINT `RC_PAP_TYPE_DURATION` CHECK (`type` = 'photo' and `duration` = 0 or `type` = 'video' and `duration` > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -4270,7 +4270,7 @@ CREATE TABLE `pap` (
 
 LOCK TABLES `pap` WRITE;
 /*!40000 ALTER TABLE `pap` DISABLE KEYS */;
-INSERT INTO `pap` (`user_id`, `room_id`, `sent_order`, `lens_id`, `duration`, `content_type`) VALUES (1,66,1,219,15,'video'),
+INSERT INTO `pap` (`user_id`, `room_id`, `sent_order`, `lens_id`, `duration`, `type`) VALUES (1,66,1,219,15,'video'),
 (3,15,1,111,7,'video'),
 (3,48,1,125,0,'photo'),
 (5,12,1,181,0,'photo'),
@@ -4683,7 +4683,7 @@ SET character_set_client = utf8mb4;
   1 AS `sent_order`,
   1 AS `lens_id`,
   1 AS `duration`,
-  1 AS `content_type` */;
+  1 AS `type` */;
 SET character_set_client = @saved_cs_client;
 
 --
@@ -5821,11 +5821,11 @@ DROP TABLE IF EXISTS `subscription`;
 /*!40101 SET character_set_client = utf8mb4 */;
 CREATE TABLE `subscription` (
   `subscription_number` int(11) NOT NULL AUTO_INCREMENT,
-  `user_id` int(11) DEFAULT NULL CHECK (`user_id` > 0),
+  `user_id` int(11) NOT NULL CHECK (`user_id` > 0),
   `subscribe_date` date NOT NULL,
   `expire_date` date NOT NULL,
   `status` enum('active','inactive') NOT NULL DEFAULT 'active',
-  PRIMARY KEY (`subscription_number`),
+  PRIMARY KEY (`subscription_number`,`user_id`),
   KEY `RA_SUBSCRIPTION_USER` (`user_id`),
   CONSTRAINT `RA_SUBSCRIPTION_USER` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=229 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
@@ -6264,6 +6264,72 @@ INSERT INTO `user` (`user_id`, `email`, `password`, `username`, `telp_num`, `bir
 (150,'ostout@example.com','1*2yDj)s^5','davidcline','08110010264','1966-09-20','2020-09-22',0);
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_user_after_insert
+AFTER INSERT ON `User`
+FOR EACH ROW
+BEGIN
+  INSERT INTO Statistik_Kreator (user_id, pap_count, lens_count)
+  VALUES (NEW.user_id, 0, 0);
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_user_after_update
+AFTER UPDATE ON `User`
+FOR EACH ROW
+BEGIN
+  IF NEW.user_id <> OLD.user_id THEN
+    UPDATE Statistik_Kreator
+       SET user_id = NEW.user_id
+     WHERE user_id = OLD.user_id;
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_user_after_delete
+AFTER DELETE ON `User`
+FOR EACH ROW
+BEGIN
+  DELETE FROM Statistik_Kreator
+   WHERE user_id = OLD.user_id;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `user_snap_stats`
@@ -6420,7 +6486,7 @@ USE `papchat`;
 /*!50001 SET collation_connection      = utf8mb4_general_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
 /*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
-/*!50001 VIEW `recent_pap` AS select `p`.`user_id` AS `user_id`,`p`.`room_id` AS `room_id`,`p`.`sent_order` AS `sent_order`,`p`.`lens_id` AS `lens_id`,`p`.`duration` AS `duration`,`p`.`content_type` AS `content_type` from (`pap` `p` join `content` `c` on(`p`.`user_id` = `c`.`user_id` and `p`.`room_id` = `c`.`room_id` and `p`.`sent_order` = `c`.`sent_order`)) where `c`.`send_time` >= curdate() - interval 2 year */;
+/*!50001 VIEW `recent_pap` AS select `p`.`user_id` AS `user_id`,`p`.`room_id` AS `room_id`,`p`.`sent_order` AS `sent_order`,`p`.`lens_id` AS `lens_id`,`p`.`duration` AS `duration`,`p`.`type` AS `type` from (`pap` `p` join `content` `c` on(`p`.`user_id` = `c`.`user_id` and `p`.`room_id` = `c`.`room_id` and `p`.`sent_order` = `c`.`sent_order`)) where `c`.`send_time` >= curdate() - interval 2 year */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
 /*!50001 SET collation_connection      = @saved_col_connection */;
@@ -6452,4 +6518,4 @@ USE `papchat`;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2025-05-31 21:18:52
+-- Dump completed on 2025-05-31 21:40:30
