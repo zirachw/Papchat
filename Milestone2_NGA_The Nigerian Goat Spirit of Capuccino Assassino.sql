@@ -2208,6 +2208,28 @@ INSERT INTO `content` (`user_id`, `room_id`, `sent_order`, `send_time`, `is_exis
 (150,81,1,'2025-01-25 18:58:11','0');
 /*!40000 ALTER TABLE `content` ENABLE KEYS */;
 UNLOCK TABLES;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_fill_send_time
+BEFORE INSERT ON Content
+FOR EACH ROW
+BEGIN
+    IF NEW.send_time IS NULL THEN
+        SET NEW.send_time = CURRENT_TIMESTAMP;
+    END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `friend`
@@ -2851,7 +2873,7 @@ CREATE TABLE `image` (
   `name` varchar(255) NOT NULL CHECK (`name` <> ''),
   PRIMARY KEY (`user_id`,`room_id`,`sent_order`,`addon_idx`),
   CONSTRAINT `RA_IMAGE_ADDON` FOREIGN KEY (`user_id`, `room_id`, `sent_order`, `addon_idx`) REFERENCES `add_on` (`user_id`, `room_id`, `sent_order`, `addon_idx`) ON DELETE CASCADE,
-  CONSTRAINT `CK_Image_FileExt` CHECK (lcase(`name`) like '%.png' or lcase(`name`) like '%.jpeg' or lcase(`name`) like '%.jpg')
+  CONSTRAINT `CK_FILEEXT_VALID` CHECK (lcase(`name`) like '%.png' or lcase(`name`) like '%.jpeg' or lcase(`name`) like '%.jpg')
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -2927,8 +2949,6 @@ INSERT INTO `image` (`user_id`, `room_id`, `sent_order`, `addon_idx`, `name`) VA
 (17,105,1,5,'image_162.png'),
 (17,105,1,6,'image_162.png'),
 (17,105,1,7,'image_162.png'),
-(17,105,1,8,'image_162.png'),
-(17,105,1,9,'image_162.png'),
 (17,138,1,1,'image_5.jpg'),
 (17,138,1,2,'image_5.jpg'),
 (17,138,1,3,'image_5.jpg'),
@@ -3646,6 +3666,71 @@ INSERT INTO `lens` (`lens_id`, `user_id`, `name`, `release_date`) VALUES (1,53,'
 (267,49,'sisterLens','2025-01-24');
 /*!40000 ALTER TABLE `lens` ENABLE KEYS */;
 UNLOCK TABLES;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_lens_after_insert
+AFTER INSERT ON Lens
+FOR EACH ROW
+BEGIN
+  DECLARE kreator_id INT;
+  SET kreator_id = NEW.user_id;
+
+  IF EXISTS(
+     SELECT 1 FROM Statistik_Kreator WHERE user_id = kreator_id
+    ) THEN
+    UPDATE Statistik_Kreator
+       SET lens_count = lens_count + 1
+     WHERE user_id = kreator_id;
+  ELSE
+    INSERT INTO Statistik_Kreator (user_id, pap_count, lens_count)
+    VALUES(
+      kreator_id,
+      ( SELECT COUNT(*) 
+          FROM Pap p
+          JOIN Lens l ON p.lens_id = l.lens_id
+         WHERE l.user_id = kreator_id
+      ),
+      1
+    );
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_lens_after_delete
+AFTER DELETE ON Lens
+FOR EACH ROW
+BEGIN
+  DECLARE kreator_id INT;
+  SET kreator_id = OLD.user_id;
+
+  UPDATE Statistik_Kreator
+     SET lens_count = lens_count - 1
+   WHERE user_id = kreator_id;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
 
 --
 -- Table structure for table `lens_level`
@@ -4384,6 +4469,222 @@ INSERT INTO `pap` (`user_id`, `room_id`, `sent_order`, `lens_id`, `duration`, `c
 (147,2,1,85,0,'photo');
 /*!40000 ALTER TABLE `pap` ENABLE KEYS */;
 UNLOCK TABLES;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_pap_after_insert
+AFTER INSERT ON Pap
+FOR EACH ROW
+BEGIN
+  DECLARE kreator_id INT;
+
+  IF NEW.lens_id IS NOT NULL THEN
+    SELECT user_id 
+      INTO kreator_id
+      FROM Lens
+     WHERE lens_id = NEW.lens_id
+     LIMIT 1;
+
+    IF EXISTS(
+        SELECT 1
+          FROM Statistik_Kreator
+         WHERE user_id = kreator_id
+       ) THEN
+      UPDATE Statistik_Kreator
+         SET pap_count = pap_count + 1
+       WHERE user_id = kreator_id;
+    ELSE
+      INSERT INTO Statistik_Kreator (user_id, pap_count, lens_count)
+      VALUES (
+        kreator_id,
+        1,
+        ( SELECT COUNT(*) FROM Lens WHERE user_id = kreator_id )
+      );
+    END IF;
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_update_user_snap_stats
+AFTER INSERT ON Pap
+FOR EACH ROW
+BEGIN
+    INSERT INTO User_Snap_Stats (user_id, is_active, total_snap)
+    VALUES (NEW.user_id, TRUE, 1)
+    ON DUPLICATE KEY UPDATE
+        is_active = TRUE,
+        total_snap = total_snap + 1;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_pap_after_update
+AFTER UPDATE ON Pap
+FOR EACH ROW
+BEGIN
+  DECLARE old_creator INT;
+  DECLARE new_creator INT;
+
+  IF OLD.lens_id IS NOT NULL 
+     AND NEW.lens_id IS NOT NULL 
+     AND OLD.lens_id <> NEW.lens_id THEN
+
+    SELECT user_id 
+      INTO old_creator
+      FROM Lens
+     WHERE lens_id = OLD.lens_id
+     LIMIT 1;
+
+    UPDATE Statistik_Kreator
+       SET pap_count = pap_count - 1
+     WHERE user_id = old_creator;
+
+    SELECT user_id 
+      INTO new_creator
+      FROM Lens
+     WHERE lens_id = NEW.lens_id
+     LIMIT 1;
+
+    IF EXISTS(
+        SELECT 1
+          FROM Statistik_Kreator
+         WHERE user_id = new_creator
+       ) THEN
+      UPDATE Statistik_Kreator
+         SET pap_count = pap_count + 1
+       WHERE user_id = new_creator;
+    ELSE
+      INSERT INTO Statistik_Kreator (user_id, pap_count, lens_count)
+      VALUES (
+        new_creator,
+        1,
+        ( SELECT COUNT(*) FROM Lens WHERE user_id = new_creator )
+      );
+    END IF;
+
+  ELSEIF OLD.lens_id IS NULL 
+        AND NEW.lens_id IS NOT NULL THEN
+
+    SELECT user_id 
+      INTO new_creator
+      FROM Lens
+     WHERE lens_id = NEW.lens_id
+     LIMIT 1;
+
+    IF EXISTS(
+        SELECT 1
+          FROM Statistik_Kreator
+         WHERE user_id = new_creator
+       ) THEN
+      UPDATE Statistik_Kreator
+         SET pap_count = pap_count + 1
+       WHERE user_id = new_creator;
+    ELSE
+      INSERT INTO Statistik_Kreator (user_id, pap_count, lens_count)
+      VALUES (
+        new_creator,
+        1,
+        ( SELECT COUNT(*) FROM Lens WHERE user_id = new_creator )
+      );
+    END IF;
+
+  ELSEIF OLD.lens_id IS NOT NULL 
+        AND NEW.lens_id IS NULL THEN
+
+    SELECT user_id 
+      INTO old_creator
+      FROM Lens
+     WHERE lens_id = OLD.lens_id
+     LIMIT 1;
+
+    UPDATE Statistik_Kreator
+       SET pap_count = pap_count - 1
+     WHERE user_id = old_creator;
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
+/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
+/*!50003 SET @saved_col_connection = @@collation_connection */ ;
+/*!50003 SET character_set_client  = utf8mb4 */ ;
+/*!50003 SET character_set_results = utf8mb4 */ ;
+/*!50003 SET collation_connection  = utf8mb4_general_ci */ ;
+/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
+/*!50003 SET sql_mode              = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION' */ ;
+DELIMITER ;;
+/*!50003 CREATE*/ /*!50017 DEFINER=`root`@`localhost`*/ /*!50003 TRIGGER trg_pap_after_delete
+AFTER DELETE ON Pap
+FOR EACH ROW
+BEGIN
+  DECLARE kreator_id INT;
+
+  IF OLD.lens_id IS NOT NULL THEN
+    SELECT user_id 
+      INTO kreator_id
+      FROM Lens
+     WHERE lens_id = OLD.lens_id
+     LIMIT 1;
+
+    UPDATE Statistik_Kreator
+       SET pap_count = pap_count - 1
+     WHERE user_id = kreator_id;
+  END IF;
+END */;;
+DELIMITER ;
+/*!50003 SET sql_mode              = @saved_sql_mode */ ;
+/*!50003 SET character_set_client  = @saved_cs_client */ ;
+/*!50003 SET character_set_results = @saved_cs_results */ ;
+/*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+--
+-- Temporary table structure for view `recent_pap`
+--
+
+DROP TABLE IF EXISTS `recent_pap`;
+/*!50001 DROP VIEW IF EXISTS `recent_pap`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8mb4;
+/*!50001 CREATE VIEW `recent_pap` AS SELECT
+ 1 AS `user_id`,
+  1 AS `room_id`,
+  1 AS `sent_order`,
+  1 AS `lens_id`,
+  1 AS `duration`,
+  1 AS `content_type` */;
+SET character_set_client = @saved_cs_client;
 
 --
 -- Table structure for table `room_chat`
@@ -5373,6 +5674,145 @@ INSERT INTO `room_join` (`room_id`, `user_id`, `join_date`) VALUES (1,24,'2025-0
 UNLOCK TABLES;
 
 --
+-- Table structure for table `statistik_kreator`
+--
+
+DROP TABLE IF EXISTS `statistik_kreator`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `statistik_kreator` (
+  `user_id` int(11) DEFAULT NULL,
+  `pap_count` bigint(21) DEFAULT NULL,
+  `lens_count` bigint(21) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `statistik_kreator`
+--
+
+LOCK TABLES `statistik_kreator` WRITE;
+/*!40000 ALTER TABLE `statistik_kreator` DISABLE KEYS */;
+INSERT INTO `statistik_kreator` (`user_id`, `pap_count`, `lens_count`) VALUES (1,1,1),
+(2,1,1),
+(3,2,1),
+(4,3,2),
+(6,2,1),
+(8,2,1),
+(9,0,1),
+(10,1,2),
+(13,1,1),
+(14,2,2),
+(16,3,3),
+(18,1,2),
+(19,1,1),
+(20,0,2),
+(24,1,2),
+(25,5,6),
+(27,2,2),
+(28,2,4),
+(30,0,2),
+(31,0,1),
+(32,2,3),
+(33,3,2),
+(34,0,1),
+(35,2,2),
+(36,0,1),
+(37,1,2),
+(38,0,2),
+(40,0,1),
+(41,9,15),
+(43,1,3),
+(44,0,1),
+(45,1,1),
+(46,0,3),
+(47,1,1),
+(48,0,2),
+(49,1,2),
+(50,2,2),
+(51,1,2),
+(52,22,33),
+(53,0,1),
+(55,2,2),
+(56,2,1),
+(58,1,2),
+(59,1,1),
+(63,1,1),
+(64,2,2),
+(65,2,2),
+(66,0,1),
+(67,0,2),
+(69,1,1),
+(70,2,1),
+(72,0,2),
+(73,1,1),
+(74,0,1),
+(75,0,1),
+(76,2,1),
+(77,6,3),
+(78,0,1),
+(79,0,1),
+(83,3,1),
+(85,2,2),
+(86,1,3),
+(87,1,1),
+(88,3,3),
+(89,1,1),
+(90,2,1),
+(91,0,2),
+(92,2,1),
+(94,0,2),
+(95,1,1),
+(96,4,4),
+(98,1,2),
+(99,1,2),
+(100,0,1),
+(101,1,1),
+(102,1,1),
+(103,2,3),
+(104,1,2),
+(106,0,1),
+(107,1,1),
+(108,6,2),
+(109,0,1),
+(112,2,1),
+(114,0,2),
+(115,1,2),
+(116,4,5),
+(117,0,1),
+(118,0,1),
+(119,4,4),
+(120,0,1),
+(122,2,1),
+(123,0,2),
+(124,2,3),
+(126,0,3),
+(127,0,1),
+(128,0,1),
+(129,1,1),
+(130,3,1),
+(131,1,1),
+(132,1,2),
+(133,4,3),
+(134,20,24),
+(135,1,1),
+(136,1,1),
+(137,1,1),
+(138,1,1),
+(139,0,1),
+(141,2,2),
+(142,2,1),
+(143,2,4),
+(144,2,2),
+(145,2,3),
+(146,1,2),
+(148,3,2),
+(149,1,1),
+(150,0,1);
+/*!40000 ALTER TABLE `statistik_kreator` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `subscription`
 --
 
@@ -5629,6 +6069,20 @@ INSERT INTO `subscription` (`subscription_number`, `user_id`, `subscribe_date`, 
 UNLOCK TABLES;
 
 --
+-- Temporary table structure for view `top10_users_by_lens_usage`
+--
+
+DROP TABLE IF EXISTS `top10_users_by_lens_usage`;
+/*!50001 DROP VIEW IF EXISTS `top10_users_by_lens_usage`*/;
+SET @saved_cs_client     = @@character_set_client;
+SET character_set_client = utf8mb4;
+/*!50001 CREATE VIEW `top10_users_by_lens_usage` AS SELECT
+ 1 AS `username`,
+  1 AS `total_snap_with_lens`,
+  1 AS `total_distinct_lens_used` */;
+SET character_set_client = @saved_cs_client;
+
+--
 -- Table structure for table `user`
 --
 
@@ -5648,7 +6102,7 @@ CREATE TABLE `user` (
   UNIQUE KEY `email` (`email`),
   KEY `RA_USER_LENSLEVEL` (`level_id`),
   CONSTRAINT `RA_USER_LENSLEVEL` FOREIGN KEY (`level_id`) REFERENCES `lens_level` (`level_id`) ON DELETE SET NULL,
-  CONSTRAINT `RA_USER_EMAIL` CHECK (`email` like '%_@_%.com')
+  CONSTRAINT `CK_EMAIL_VALID` CHECK (`email` like '%_@_%.com')
 ) ENGINE=InnoDB AUTO_INCREMENT=151 DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -5810,6 +6264,184 @@ INSERT INTO `user` (`user_id`, `email`, `password`, `username`, `telp_num`, `bir
 (150,'ostout@example.com','1*2yDj)s^5','davidcline','08110010264','1966-09-20','2020-09-22',0);
 /*!40000 ALTER TABLE `user` ENABLE KEYS */;
 UNLOCK TABLES;
+
+--
+-- Table structure for table `user_snap_stats`
+--
+
+DROP TABLE IF EXISTS `user_snap_stats`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `user_snap_stats` (
+  `user_id` int(11) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 0,
+  `total_snap` int(11) NOT NULL DEFAULT 0,
+  PRIMARY KEY (`user_id`),
+  CONSTRAINT `user_snap_stats_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `user_snap_stats`
+--
+
+LOCK TABLES `user_snap_stats` WRITE;
+/*!40000 ALTER TABLE `user_snap_stats` DISABLE KEYS */;
+INSERT INTO `user_snap_stats` (`user_id`, `is_active`, `total_snap`) VALUES (1,1,1),
+(3,1,2),
+(5,1,4),
+(7,1,2),
+(8,1,1),
+(9,1,2),
+(10,1,1),
+(11,1,3),
+(12,1,1),
+(13,1,1),
+(14,1,1),
+(16,1,6),
+(17,1,2),
+(18,1,2),
+(20,1,3),
+(21,1,2),
+(22,1,1),
+(23,1,1),
+(25,1,2),
+(26,1,2),
+(27,1,1),
+(28,1,3),
+(30,1,2),
+(31,1,1),
+(32,1,1),
+(33,1,1),
+(34,1,2),
+(35,1,3),
+(36,1,1),
+(37,1,1),
+(38,1,1),
+(41,1,3),
+(43,1,2),
+(44,1,1),
+(45,1,1),
+(46,1,2),
+(47,1,1),
+(48,1,3),
+(49,1,1),
+(50,1,2),
+(51,1,3),
+(52,1,2),
+(54,1,1),
+(57,1,2),
+(58,1,1),
+(59,1,1),
+(60,1,2),
+(61,1,3),
+(62,1,2),
+(63,1,1),
+(64,1,3),
+(67,1,1),
+(68,1,3),
+(69,1,1),
+(70,1,4),
+(74,1,2),
+(75,1,1),
+(76,1,3),
+(80,1,1),
+(83,1,2),
+(84,1,1),
+(85,1,2),
+(86,1,1),
+(88,1,2),
+(89,1,1),
+(90,1,3),
+(91,1,2),
+(92,1,1),
+(93,1,1),
+(95,1,2),
+(97,1,2),
+(98,1,3),
+(99,1,1),
+(100,1,1),
+(102,1,2),
+(105,1,1),
+(107,1,2),
+(108,1,2),
+(109,1,3),
+(110,1,2),
+(111,1,1),
+(112,1,2),
+(114,1,1),
+(115,1,1),
+(116,1,1),
+(117,1,2),
+(118,1,4),
+(120,1,2),
+(122,1,1),
+(123,1,1),
+(124,1,1),
+(125,1,1),
+(126,1,2),
+(127,1,2),
+(129,1,3),
+(130,1,3),
+(131,1,1),
+(133,1,2),
+(134,1,2),
+(135,1,2),
+(136,1,2),
+(137,1,1),
+(138,1,1),
+(140,1,2),
+(141,1,1),
+(142,1,1),
+(143,1,1),
+(144,1,2),
+(145,1,1),
+(146,1,2),
+(147,1,1);
+/*!40000 ALTER TABLE `user_snap_stats` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Current Database: `papchat`
+--
+
+USE `papchat`;
+
+--
+-- Final view structure for view `recent_pap`
+--
+
+/*!50001 DROP VIEW IF EXISTS `recent_pap`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50001 VIEW `recent_pap` AS select `p`.`user_id` AS `user_id`,`p`.`room_id` AS `room_id`,`p`.`sent_order` AS `sent_order`,`p`.`lens_id` AS `lens_id`,`p`.`duration` AS `duration`,`p`.`content_type` AS `content_type` from (`pap` `p` join `content` `c` on(`p`.`user_id` = `c`.`user_id` and `p`.`room_id` = `c`.`room_id` and `p`.`sent_order` = `c`.`sent_order`)) where `c`.`send_time` >= curdate() - interval 2 year */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
+
+--
+-- Final view structure for view `top10_users_by_lens_usage`
+--
+
+/*!50001 DROP VIEW IF EXISTS `top10_users_by_lens_usage`*/;
+/*!50001 SET @saved_cs_client          = @@character_set_client */;
+/*!50001 SET @saved_cs_results         = @@character_set_results */;
+/*!50001 SET @saved_col_connection     = @@collation_connection */;
+/*!50001 SET character_set_client      = utf8mb4 */;
+/*!50001 SET character_set_results     = utf8mb4 */;
+/*!50001 SET collation_connection      = utf8mb4_general_ci */;
+/*!50001 CREATE ALGORITHM=UNDEFINED */
+/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50001 VIEW `top10_users_by_lens_usage` AS select `u`.`username` AS `username`,count(0) AS `total_snap_with_lens`,count(distinct `p`.`lens_id`) AS `total_distinct_lens_used` from (`pap` `p` join `user` `u` on(`p`.`user_id` = `u`.`user_id`)) where `p`.`lens_id` is not null group by `u`.`user_id`,`u`.`username` order by count(0) desc limit 10 */;
+/*!50001 SET character_set_client      = @saved_cs_client */;
+/*!50001 SET character_set_results     = @saved_cs_results */;
+/*!50001 SET collation_connection      = @saved_col_connection */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -5820,4 +6452,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*M!100616 SET NOTE_VERBOSITY=@OLD_NOTE_VERBOSITY */;
 
--- Dump completed on 2025-05-31 20:04:34
+-- Dump completed on 2025-05-31 21:18:52
