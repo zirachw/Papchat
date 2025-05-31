@@ -3754,10 +3754,10 @@ CREATE TABLE `lens_level` (
 
 LOCK TABLES `lens_level` WRITE;
 /*!40000 ALTER TABLE `lens_level` DISABLE KEYS */;
-INSERT INTO `lens_level` (`level_id`, `level_name`, `incentive`, `n_min_lens_created`) VALUES (0,'Not Rated','','1'),
-(1,'Bronze','',''),
-(2,'Silver','',''),
-(3,'Gold','','');
+INSERT INTO `lens_level` (`level_id`, `level_name`, `incentive`, `n_min_lens_created`) VALUES (0,'Not Rated','0','1'),
+(1,'Bronze','1000000','10'),
+(2,'Silver','2000000','20'),
+(3,'Gold','3000000','30');
 /*!40000 ALTER TABLE `lens_level` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -3771,7 +3771,7 @@ DROP TABLE IF EXISTS `lens_type`;
 CREATE TABLE `lens_type` (
   `lens_id` int(11) NOT NULL CHECK (`lens_id` > 0),
   `type` enum('Face','Background') NOT NULL,
-  PRIMARY KEY (`lens_id`,`type`),
+  PRIMARY KEY (`lens_id`),
   CONSTRAINT `RA_LENSTYPE_LENS` FOREIGN KEY (`lens_id`) REFERENCES `lens` (`lens_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
