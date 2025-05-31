@@ -3771,7 +3771,7 @@ DROP TABLE IF EXISTS `lens_type`;
 CREATE TABLE `lens_type` (
   `lens_id` int(11) NOT NULL CHECK (`lens_id` > 0),
   `type` enum('Face','Background') NOT NULL,
-  PRIMARY KEY (`lens_id`),
+  PRIMARY KEY (`lens_id`, `type`),
   CONSTRAINT `RA_LENSTYPE_LENS` FOREIGN KEY (`lens_id`) REFERENCES `lens` (`lens_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
